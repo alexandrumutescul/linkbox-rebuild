@@ -1,13 +1,25 @@
+import { useState } from 'react';
+import type { BookmarkDto, CreateBookmarkRequest, PatchBookmarkRequest } from '../shared/apiTypes';
 import { AuthTokenGate } from './components/AuthTokenGate';
+import { BookmarkForm } from './components/BookmarkForm';
+import { BookmarkList } from './components/BookmarkList';
 import { Button } from './components/Button';
-import { InlineError } from './components/InlineError';
-import { LoadingState } from './components/LoadingState';
+import { EditBookmarkDialog } from './components/EditBookmarkDialog';
 import { useAuthToken } from './hooks/useAuthToken';
 import { useBookmarks } from './hooks/useBookmarks';
 
 export default function App() {
   const auth = useAuthToken();
   const bookmarksState = useBookmarks(auth.token);
+  const [editingBookmark, setEditingBookmark] = useState<BookmarkDto | null>(null);
+
+  const create = async (bookmark: CreateBookmarkRequest) => {
+    await bookmarksState.create(bookmark);
+  };
+
+  const update = async (id: number, bookmark: PatchBookmarkRequest) => {
+    await bookmarksState.update(id, bookmark);
+  };
 
   return (
     <main className="app-shell">
@@ -18,46 +30,28 @@ export default function App() {
               <p className="eyebrow">Linkbox</p>
               <h1 id="app-title">Your bookmarks</h1>
             </div>
-            <Button variant="secondary" onClick={auth.clearToken}>
-              Change token
-            </Button>
+            <Button variant="secondary" onClick={auth.clearToken}>Change token</Button>
           </div>
 
-          {bookmarksState.isLoading ? <LoadingState message="Loading bookmarks…" /> : null}
+          <BookmarkForm onSave={create} />
 
-          {bookmarksState.error ? (
-            <div className="error-panel">
-              <InlineError message={bookmarksState.error} />
-              <div className="button-row">
-                <Button onClick={bookmarksState.reload}>Retry</Button>
-                <Button variant="secondary" onClick={auth.clearToken}>
-                  Change token
-                </Button>
-              </div>
+          <section className="bookmarks-section" aria-labelledby="bookmark-list-title">
+            <div className="section-header">
+              <h2 id="bookmark-list-title">Saved bookmarks</h2>
+              {bookmarksState.isLoading && bookmarksState.isLoaded ? <span className="subtle-status">Refreshing…</span> : null}
             </div>
-          ) : null}
+            <BookmarkList
+              bookmarks={bookmarksState.bookmarks}
+              isLoading={bookmarksState.isLoading}
+              isLoaded={bookmarksState.isLoaded}
+              error={bookmarksState.error}
+              onRetry={bookmarksState.reload}
+              onEdit={setEditingBookmark}
+              onDelete={bookmarksState.delete}
+            />
+          </section>
 
-          {!bookmarksState.isLoading && !bookmarksState.error && bookmarksState.isLoaded ? (
-            bookmarksState.bookmarks.length > 0 ? (
-              <ul className="bookmark-list" aria-label="Bookmarks">
-                {bookmarksState.bookmarks.map((bookmark) => (
-                  <li className="bookmark-card" key={bookmark.id}>
-                    <a href={bookmark.url}>{bookmark.title}</a>
-                    {bookmark.notes ? <p>{bookmark.notes}</p> : null}
-                    {bookmark.tags.length > 0 ? (
-                      <ul className="tag-list" aria-label={`${bookmark.title} tags`}>
-                        {bookmark.tags.map((tag) => (
-                          <li key={tag}>{tag}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="empty-state">No bookmarks saved yet.</p>
-            )
-          ) : null}
+          <EditBookmarkDialog bookmark={editingBookmark} onClose={() => setEditingBookmark(null)} onSave={update} />
         </section>
       </AuthTokenGate>
     </main>
