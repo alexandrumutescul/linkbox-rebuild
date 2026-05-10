@@ -30,6 +30,15 @@ export interface BookmarksListResponse {
   bookmarks: BookmarkDto[];
 }
 
+export interface TagListItemDto {
+  name: string;
+  bookmarkCount: number;
+}
+
+export interface TagsListResponse {
+  tags: TagListItemDto[];
+}
+
 export interface ApiErrorResponse {
   error: {
     code: string;

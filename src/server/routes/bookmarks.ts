@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { BookmarksRepository } from '../db/repositories/bookmarksRepository.js';
 import { toBookmarkDto } from '../types/bookmark.js';
 import { parseBookmarkId, validateCreateBookmarkPayload, validatePatchBookmarkPayload } from '../validation/bookmarks.js';
+import { parseBookmarkListQuery } from '../validation/query.js';
 
 function notFound(): Error & { status: number; code: string } {
   const error = new Error('Bookmark not found') as Error & { status: number; code: string };
@@ -23,9 +24,10 @@ export function createBookmarksRouter(bookmarksRepository: BookmarksRepository):
     }
   });
 
-  router.get('/', (_request, response, next) => {
+  router.get('/', (request, response, next) => {
     try {
-      response.json({ bookmarks: bookmarksRepository.list().map(toBookmarkDto) });
+      const filters = parseBookmarkListQuery(request.query);
+      response.json({ bookmarks: bookmarksRepository.list(filters).map(toBookmarkDto) });
     } catch (error) {
       next(error);
     }

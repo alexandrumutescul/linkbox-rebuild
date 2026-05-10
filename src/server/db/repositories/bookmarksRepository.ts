@@ -1,7 +1,7 @@
 import type { Statement } from 'better-sqlite3';
 import type { CreateBookmarkInput, PatchBookmarkInput, Bookmark } from '../../types/bookmark.js';
 import type { LinkboxDatabase } from '../connection.js';
-import { TagsRepository } from './tagsRepository.js';
+import { normalizeTagNames, TagsRepository } from './tagsRepository.js';
 
 interface BookmarkDbRow {
   id: number;
@@ -14,6 +14,11 @@ interface BookmarkDbRow {
 
 interface TagNameRow {
   name: string;
+}
+
+export interface BookmarkListFilters {
+  searchText?: string;
+  tag?: string;
 }
 
 function toBookmark(row: BookmarkDbRow, tags: string[]): Bookmark {
@@ -91,8 +96,47 @@ export class BookmarksRepository {
     return created;
   }
 
-  list(): Bookmark[] {
-    return this.listStatement.all().map((row) => this.hydrate(row as BookmarkDbRow));
+  list(filters: BookmarkListFilters = {}): Bookmark[] {
+    if (!filters.searchText && !filters.tag) {
+      return this.listStatement.all().map((row) => this.hydrate(row as BookmarkDbRow));
+    }
+
+    const whereClauses: string[] = [];
+    const parameters: string[] = [];
+
+    if (filters.searchText) {
+      const likeText = `%${filters.searchText.toLowerCase()}%`;
+      whereClauses.push(`(
+        lower(bookmarks.title) LIKE ?
+        OR lower(bookmarks.url) LIKE ?
+        OR lower(COALESCE(bookmarks.description, '')) LIKE ?
+      )`);
+      parameters.push(likeText, likeText, likeText);
+    }
+
+    if (filters.tag) {
+      const normalizedTag = normalizeTagNames([filters.tag])[0];
+      if (!normalizedTag) {
+        return this.listStatement.all().map((row) => this.hydrate(row as BookmarkDbRow));
+      }
+
+      whereClauses.push(`EXISTS (
+        SELECT 1
+        FROM bookmark_tags
+        INNER JOIN tags ON tags.id = bookmark_tags.tag_id
+        WHERE bookmark_tags.bookmark_id = bookmarks.id AND tags.name = ?
+      )`);
+      parameters.push(normalizedTag);
+    }
+
+    const statement = this.database.prepare(`
+      SELECT id, url, title, description, created_at, updated_at
+      FROM bookmarks
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY created_at DESC, id DESC
+    `);
+
+    return statement.all(...parameters).map((row) => this.hydrate(row as BookmarkDbRow));
   }
 
   findById(id: number): Bookmark | null {
