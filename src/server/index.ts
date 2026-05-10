@@ -3,18 +3,20 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
 import { loadConfig, type ServerConfig } from './config.js';
+import { openDatabase } from './db/connection.js';
+import { runMigrations } from './db/migrate.js';
 import { errorHandler } from './middleware/errors.js';
+import { createApiRouter } from './routes/index.js';
 
 const projectRoot = process.cwd();
 
 export async function createApp(config: ServerConfig = loadConfig()) {
   const app = express();
+  const database = openDatabase(config);
+  runMigrations(database);
 
   app.use(express.json());
-
-  app.get('/api/health', (_request, response) => {
-    response.json({ ok: true });
-  });
+  app.use('/api', createApiRouter({ config, database }));
 
   if (config.isDevelopment) {
     const vite = await createViteServer({

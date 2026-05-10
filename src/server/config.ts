@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 export type NodeEnvironment = 'development' | 'production' | 'test';
 
 export interface ServerConfig {
@@ -5,6 +7,8 @@ export interface ServerConfig {
   nodeEnv: NodeEnvironment;
   isProduction: boolean;
   isDevelopment: boolean;
+  dbPath: string;
+  apiToken: string;
 }
 
 function parsePort(value: string | undefined): number {
@@ -28,6 +32,26 @@ function parseNodeEnv(value: string | undefined): NodeEnvironment {
   return 'development';
 }
 
+function parseApiToken(value: string | undefined, nodeEnv: NodeEnvironment): string {
+  const token = value?.trim() ?? '';
+
+  if (!token && nodeEnv !== 'test') {
+    throw new Error('LINKBOX_API_TOKEN must be set');
+  }
+
+  return token;
+}
+
+function parseDbPath(value: string | undefined): string {
+  const dbPath = value?.trim();
+
+  if (dbPath) {
+    return dbPath;
+  }
+
+  return path.resolve(process.cwd(), 'data/linkbox.sqlite');
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const nodeEnv = parseNodeEnv(env.NODE_ENV);
 
@@ -36,5 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     nodeEnv,
     isProduction: nodeEnv === 'production',
     isDevelopment: nodeEnv === 'development',
+    dbPath: parseDbPath(env.LINKBOX_DB_PATH),
+    apiToken: parseApiToken(env.LINKBOX_API_TOKEN, nodeEnv),
   };
 }
