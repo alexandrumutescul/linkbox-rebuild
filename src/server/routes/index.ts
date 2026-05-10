@@ -3,6 +3,7 @@ import type { ServerConfig } from '../config.js';
 import type { LinkboxDatabase } from '../db/connection.js';
 import { BookmarksRepository } from '../db/repositories/bookmarksRepository.js';
 import { requireBearerToken } from '../middleware/auth.js';
+import { createBookmarksRouter } from './bookmarks.js';
 import { createHealthRouter } from './health.js';
 
 interface RoutesDependencies {
@@ -16,10 +17,7 @@ export function createApiRouter({ config, database }: RoutesDependencies): Route
 
   router.use(createHealthRouter());
   router.use(requireBearerToken(config));
-
-  router.get('/bookmarks', (_request, response) => {
-    response.json({ bookmarks: bookmarksRepository.list() });
-  });
+  router.use('/bookmarks', createBookmarksRouter(bookmarksRepository));
 
   return router;
 }

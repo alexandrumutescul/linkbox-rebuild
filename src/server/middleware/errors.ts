@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 interface HttpError extends Error {
   status?: number;
   code?: string;
+  details?: string[];
 }
 
 function errorCodeFor(status: number, error: HttpError): string {
@@ -12,6 +13,10 @@ function errorCodeFor(status: number, error: HttpError): string {
 
   if (status === 401) {
     return 'UNAUTHORIZED';
+  }
+
+  if (status === 404) {
+    return 'NOT_FOUND';
   }
 
   if (status >= 400 && status < 500) {
@@ -33,6 +38,7 @@ export const errorHandler: ErrorRequestHandler = (error: HttpError, _request, re
     error: {
       code: errorCodeFor(status, error),
       message,
+      ...(error.details && status < 500 ? { details: error.details } : {}),
     },
   });
 };
